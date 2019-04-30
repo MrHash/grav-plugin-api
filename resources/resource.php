@@ -28,9 +28,10 @@ class Resource
             } else {
                 $return = $this->getList();
             }
-        } else {
-            $method = $httpMethod . 'Item';
-            $return = $this->$method();
+        // Disable anything other than GET from API for now
+        // } else {
+        //     $method = $httpMethod . 'Item';
+        //     $return = $this->$method();
         }
 
         if ($return !== '') {

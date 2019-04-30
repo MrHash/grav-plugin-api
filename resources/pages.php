@@ -3,8 +3,8 @@ namespace Grav\Plugin\Api;
 require_once 'resource.php';
 
 use Grav\Common\Filesystem\Folder;
+use Grav\Common\Page\Collection;
 use Grav\Common\Page\Page;
-use RocketTheme\Toolbox\File\File;
 use Symfony\Component\Yaml\Yaml;
 
 /**
@@ -23,20 +23,58 @@ class Pages extends Resource
      */
     public function getList()
     {
-        $pagesCollection = $this->grav['pages']->all();
+        $uri = $this->grav['uri'];
+        $path = '/'.$uri->query('path');
+        $page = (int)$uri->query('page');
+        $size = (int)$uri->query('size');
+        $category = $uri->query('category');
 
-        $return = [];
-
-        foreach($pagesCollection as $page) {
-            $return[$page->route()] = [];
-            $return[$page->route()]['title'] = $page->title();
-            $return[$page->route()]['url'] = $page->url();
-            $return[$page->route()]['visible'] = $page->visible();
-            $return[$page->route()]['isDir'] = $page->isDir();
-            $return[$page->route()]['published'] = $page->published();
+        $rootPage = $this->grav['pages']->find($path);
+        if (!$rootPage) {
+            $this->setErrorCode(404);
+            $message = $this->buildReturnMessage('Path does not exist.');
+            return $message;
         }
 
-        return $return;
+        // filter collection
+        $selectedPages = $rootPage
+            ->children()
+            ->ofType('item')
+            ->published()
+            ->visible()
+            ->order('publishDate', 'desc');
+
+        // filter by category here because Pages doesn't support it
+        if ($category) {
+            $filteredPages = new Collection;
+            foreach ($selectedPages as $selectedPages) {
+                if (in_array($category, $selectedPages->taxonomy()['category'])) {
+                    $filteredPages->addPage($selectedPages);
+                }
+            }
+            $selectedPages = $filteredPages;
+        }
+
+        $pagedCollection = $selectedPages->batch($size > 0 ? $size : 10);
+        $pagesCollection = $pagedCollection[$page > 0 ? $page-1 : 0] ?? [];
+        $items = [];
+
+        foreach($pagesCollection as $page) {
+            $key = $page->route();
+            $items[] = [];
+            $items[$key]['title'] = $page->title();
+            $items[$key]['url'] = $page->url();
+            $items[$key]['publishDate'] = $page->publishDate();
+            $items[$key]['taxonomy'] = $page->taxonomy();
+            foreach ($page->getMedia()->images() as $image) {
+                $items[$key]['images'][] = $image->url();
+            }
+        }
+
+        return [
+            'total' => count($pagesCollection),
+            'items' => $items
+        ];
     }
 
     /**

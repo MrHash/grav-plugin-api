@@ -1,7 +1,6 @@
 <?php
 namespace Grav\Plugin;
 
-use Grav\Common\Grav;
 use Grav\Common\Plugin;
 use Grav\Common\User\User;
 
@@ -36,7 +35,8 @@ class ApiPlugin extends Plugin
         $paths = array_splice($paths, 1);
         $resource = $paths[0];
 
-        if ($resource) {
+        // only support pages endpoint for now
+        if ($resource === 'pages') {
             $file = __DIR__ . '/resources/' . $resource . '.php';
             if (file_exists($file)) {
                 require_once $file;
@@ -65,6 +65,7 @@ class ApiPlugin extends Plugin
         $isAuthenticated = $user->authenticate($password);
 
         if ($isAuthenticated) {
+            $user->set('authenticated', true);
             if ($this->authorize($user, ['admin.api', 'admin.super'])) {
                 return true;
             }
