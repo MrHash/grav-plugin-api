@@ -61,7 +61,6 @@ class Pages extends Resource
 
         foreach($pagesCollection as $page) {
             $key = $page->route();
-            $items[] = [];
             $items[$key]['title'] = $page->title();
             $items[$key]['url'] = $page->url();
             $items[$key]['publishDate'] = $page->publishDate();
