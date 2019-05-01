@@ -25,9 +25,9 @@ class Pages extends Resource
     {
         $uri = $this->grav['uri'];
         $path = '/'.$uri->query('path');
-        $page = (int)$uri->query('page');
-        $size = (int)$uri->query('size');
-        $category = $uri->query('category');
+        $start = $uri->query('_start') ?? 0;
+        $end = $uri->query('_end') ?? 16;
+        $tags = $uri->query('tags');
 
         $rootPage = $this->grav['pages']->find($path);
         if (!$rootPage) {
@@ -37,7 +37,7 @@ class Pages extends Resource
         }
 
         // filter collection
-        $selectedPages = $rootPage
+        $pagesCollection = $rootPage
             ->children()
             ->ofType('item')
             ->published()
@@ -45,34 +45,46 @@ class Pages extends Resource
             ->order('publishDate', 'desc');
 
         // filter by category here because Pages doesn't support it
-        if ($category) {
+        if ($tags) {
             $filteredPages = new Collection;
-            foreach ($selectedPages as $selectedPages) {
-                if (in_array($category, $selectedPages->taxonomy()['category'])) {
+            foreach ($pagesCollection as $selectedPages) {
+                $pageCategories = $selectedPages->taxonomy()['category'] ?? [];
+                $pageTags = $selectedPages->taxonomy()['tag'] ?? [];
+                if (in_array($tags, array_merge($pageCategories, $pageTags))) {
                     $filteredPages->addPage($selectedPages);
                 }
             }
-            $selectedPages = $filteredPages;
+            $pagesCollection = $filteredPages;
         }
 
-        $pagedCollection = $selectedPages->batch($size > 0 ? $size : 10);
-        $pagesCollection = $pagedCollection[$page > 0 ? $page-1 : 0] ?? [];
         $items = [];
-
-        foreach($pagesCollection as $page) {
+        foreach ($pagesCollection as $page) {
             $key = $page->route();
             $items[$key]['title'] = $page->title();
+            $items[$key]['description'] = str_replace('src="', 'src="http://localhost:8000', $page->content());
             $items[$key]['url'] = $page->url();
+            $items[$key]['slug'] = $page->slug();
             $items[$key]['publishDate'] = $page->publishDate();
-            $items[$key]['taxonomy'] = $page->taxonomy();
-            foreach ($page->getMedia()->images() as $image) {
-                $items[$key]['images'][] = $image->url();
+            $pageCategories = $page->taxonomy()['category'] ?? [];
+            $pageTags = $page->taxonomy()['tag'] ?? [];
+            foreach (array_merge($pageCategories, $pageTags) as $tag) {
+                $items[$key]['tags'][]['name'] = $tag;
             }
+            foreach ($page->getMedia()->images() as $image) {
+                $items[$key]['images'][$image->get('filename')] = 'http://localhost:8000'.$image->url();
+            }
+            $items[$key]['image'] = current($items[$key]['images']);
+        }
+
+        $items = array_values(array_slice($items, (int)$start, (int)$end));
+        foreach($items as $index => &$item) {
+            $item['id'] = $index+1;
         }
 
         return [
-            'total' => count($pagesCollection),
-            'items' => $items
+            'total' => count($items),
+            'data' => $items,
+            'status' => 200
         ];
     }
 
