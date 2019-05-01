@@ -26,6 +26,12 @@ class ApiPlugin extends Plugin
             return;
         }
 
+        if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
+            header('HTTP/1.1 200 Ok');
+            header('Access-Control-Max-Age: 3600');
+            exit();
+        }
+
         if (!$this->isAuthorized()) {
             header('HTTP/1.1 401 Unauthorized');
             exit();
