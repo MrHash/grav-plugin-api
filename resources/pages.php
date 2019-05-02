@@ -27,7 +27,8 @@ class Pages extends Resource
         $path = '/'.$uri->query('path');
         $start = $uri->query('_start') ?? 0;
         $end = $uri->query('_end') ?? 16;
-        $tags = $uri->query('tags');
+        $tags = array_filter(explode(',', $uri->query('tags')));
+        $categories = array_filter(explode(',', $uri->query('categories')));
 
         $rootPage = $this->grav['pages']->find($path);
         if (!$rootPage) {
@@ -44,13 +45,21 @@ class Pages extends Resource
             ->visible()
             ->order('publishDate', 'desc');
 
-        // filter by category here because Pages doesn't support it
+        // filter by tag/category here because Pages doesn't support it afaik
         if ($tags) {
             $filteredPages = new Collection;
             foreach ($pagesCollection as $selectedPages) {
-                $pageCategories = $selectedPages->taxonomy()['category'] ?? [];
-                $pageTags = $selectedPages->taxonomy()['tag'] ?? [];
-                if (in_array($tags, array_merge($pageCategories, $pageTags))) {
+                if (array_intersect($tags, $selectedPages->taxonomy()['tag'] ?? [])) {
+                    $filteredPages->addPage($selectedPages);
+                }
+            }
+            $pagesCollection = $filteredPages;
+        }
+
+        if ($categories) {
+            $filteredPages = new Collection;
+            foreach ($pagesCollection as $selectedPages) {
+                if (array_intersect($categories, $selectedPages->taxonomy()['category'] ?? [])) {
                     $filteredPages->addPage($selectedPages);
                 }
             }
@@ -65,10 +74,13 @@ class Pages extends Resource
             $items[$key]['url'] = $page->url();
             $items[$key]['slug'] = $page->slug();
             $items[$key]['publishDate'] = $page->publishDate();
-            $pageCategories = $page->taxonomy()['category'] ?? [];
             $pageTags = $page->taxonomy()['tag'] ?? [];
-            foreach (array_merge($pageCategories, $pageTags) as $tag) {
+            foreach ($pageTags as $tag) {
                 $items[$key]['tags'][]['name'] = $tag;
+            }
+            $pageCategories = $page->taxonomy()['category'] ?? [];
+            foreach ($pageCategories as $category) {
+                $items[$key]['categories'][]['name'] = $category;
             }
             foreach ($page->getMedia()->images() as $image) {
                 $items[$key]['images'][$image->get('filename')] = 'http://localhost:8000'.$image->url();
